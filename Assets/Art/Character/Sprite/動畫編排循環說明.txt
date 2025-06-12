@@ -1,0 +1,16 @@
+待機:
+Standby01、Base00、Standby02、Base00
+
+跑步:
+Run01、Run02、Run03、Run04
+
+煙霧效果(不用循環):
+ParticleEffects_Smoke01_01、ParticleEffects_Smoke01_02、ParticleEffects_Smoke01_03、ParticleEffects_Smoke01_04
+
+跳躍(不用循環):
+Jump01、Jump02 
+可搭配煙霧效果
+
+衝刺(不用循環):
+Base00、Sprint01、Sprint02
+可搭配煙霧效果
