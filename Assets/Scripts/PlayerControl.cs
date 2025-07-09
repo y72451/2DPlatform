@@ -20,27 +20,27 @@ public class PlayerControl : MonoBehaviour
     private float jumpSpeed = 0;
 
     private Rigidbody2D rb;
-    public float slopeCheckDistance = 0.1f;    
-    public LayerMask Terrain;
+    public float slopeCheckDistance = 2f;    
     bool isSloap = false;
 
-    //¨¤¦â¬ÛÃöª«¥ó
+    //è§’è‰²ç›¸é—œç‰©ä»¶
     public Transform ShootPos;
     public Transform ButtonPos;
     public Transform DustPos;
 
-    //¼È®ÉÅÜ¼Æ
+    //æš«æ™‚è®Šæ•¸
     private bool isAttacking = false;
     private bool isShooting = false;
-    private float AttackTime = 0.2f;    //§ğÀ»°Êµe®É¶¡
-    private int comboCount = 0; //±ÙÀ»³sÀ»¦¸¼Æ
+    private float AttackTime = 0.2f;    //æ”»æ“Šå‹•ç•«æ™‚é–“
+    ///private float AttackComboDelay = 0.1f;
+    private int comboCount = 0; //æ–¬æ“Šé€£æ“Šæ¬¡æ•¸
     private float AttackRunTime = 0f;
     private bool comboAttack = false;
     private bool spcialRush = false;
 
     private float ShootTime = 0.15f;
 
-    //Debug¶µ¥Ø
+    //Debugé …ç›®
     public PlayerDebugOption plrDebugOption;
 
     // Start is called before the first frame update
@@ -49,9 +49,7 @@ public class PlayerControl : MonoBehaviour
         InputMgr = GameObject.Find("InputManager").GetComponent<InputManager>();
         PrefabMgr = GameObject.Find("PrefabManager").GetComponent<PrefabManager>();
         rb = GetComponent<Rigidbody2D>();
-        Terrain = 6;
         isFaceRight = false;
-        slopeCheckDistance = 0.1f;
     }
 
     // Update is called once per frame
@@ -64,7 +62,7 @@ public class PlayerControl : MonoBehaviour
         float sloapAngle = 90;
         sloapAngle = CheckSlope();
 
-        //²¾°Ê¤è¦V
+        //ç§»å‹•æ–¹å‘
         direction = InputMgr.GetDirection();        
         if (!isOnAir)
         {
@@ -122,7 +120,7 @@ public class PlayerControl : MonoBehaviour
         }
 
 
-        //½Ä¨ë
+        //è¡åˆº
         if (Input.GetKeyDown(KeyCode.R))
         {
             if (!isRushing)
@@ -141,7 +139,7 @@ public class PlayerControl : MonoBehaviour
                 }      
                 */
 
-                //¨ú®ø§ğÀ»
+                //å–æ¶ˆæ”»æ“Š
                 if (isShooting)
                 {
                     isShooting = false;
@@ -164,7 +162,7 @@ public class PlayerControl : MonoBehaviour
             }
         }
 
-        //¸õÅD
+        //è·³èº
         if (Input.GetKeyDown(KeyCode.Space))
         {
             if (gravity.isOnAir == false)
@@ -190,14 +188,14 @@ public class PlayerControl : MonoBehaviour
 
         #region attack
 
-        //±ÙÀ»
+        //æ–¬æ“Š
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
             if (!isAttacking)
             {
                 isAttacking = true;
             }
-            //¯¸¥ßª¬ºA
+            //ç«™ç«‹ç‹€æ…‹
             if (direction == 5 && !isRushing &&!isOnAir)
             {                
                 if (comboCount == 0)
@@ -209,7 +207,7 @@ public class PlayerControl : MonoBehaviour
                 
                 if (AttackRunTime > 0 && comboCount < 2)
                 {
-                    AttackRunTime = 0; //³sÀ»·|¨ê·s§ğÀ»§P©w®É¶¡
+                    AttackRunTime = 0; //é€£æ“Šæœƒåˆ·æ–°æ”»æ“Šåˆ¤å®šæ™‚é–“
                     comboAttack = true;
                     comboCount++;                    
                     if (comboCount > 2)
@@ -237,9 +235,9 @@ public class PlayerControl : MonoBehaviour
 
         }
 
-        //³B²z§ğÀ»°Êµe»Î±µ
+        //è™•ç†æ”»æ“Šå‹•ç•«éŠœæ¥
 
-        //Note ¥Ø«e¦P¤@12f(0.2s)
+        //Note ç›®å‰åŒä¸€12f(0.2s)
         if(isAttacking)
         {
             AttackRunTime = AttackRunTime + Time.deltaTime;
@@ -264,7 +262,7 @@ public class PlayerControl : MonoBehaviour
 
         
 
-        //®gÀ»
+        //å°„æ“Š
         if (Input.GetKeyDown(KeyCode.Mouse1))
         {
             if (!isAttacking)
@@ -275,7 +273,7 @@ public class PlayerControl : MonoBehaviour
             {
                 isShooting = true;
             }
-            //¯¸¥ßª¬ºA
+            //ç«™ç«‹ç‹€æ…‹
             if (direction == 5 && !isRushing && !isOnAir)
             {
                 PlrAnim.SetInteger("ActionCode", 9);
@@ -295,7 +293,7 @@ public class PlayerControl : MonoBehaviour
             ShootBullet();
         }
 
-        //«ùÄò®gÀ»
+        //æŒçºŒå°„æ“Š
         if (Input.GetKey(KeyCode.Mouse1))
         {
             if (isShooting && isRushing == false && isOnAir == false)
@@ -401,15 +399,15 @@ public class PlayerControl : MonoBehaviour
             position = ButtonPos.position;
         }
         Vector2 direction = isFaceRight ? Vector2.right : -Vector2.right; ;
-        // «Ø¥ß¤@±ø®g½uÀË¬d©Y«×
-        RaycastHit2D hit = Physics2D.Raycast(position, direction, slopeCheckDistance, 1 << Terrain);
+        // å»ºç«‹ä¸€æ¢å°„ç·šæª¢æŸ¥å¡åº¦
+        RaycastHit2D hit = Physics2D.Raycast(position, direction, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
 
         if (hit.collider != null)
         {
-            // ­pºâ©Y«×¨¤«×
+            // è¨ˆç®—å¡åº¦è§’åº¦
             slopeAngle = Vector2.Angle(hit.normal, Vector2.up);
             Debug.Log("Slope angle: "+ slopeAngle);
-            // ¦pªG©Y«×¨¤«×¤p©ó¤@©wªº¨¤«×¡]¨Ò¦p30«×¡^¡A«h¤¹³\¨¤¦âª¦©Y
+            // å¦‚æœå¡åº¦è§’åº¦å°æ–¼ä¸€å®šçš„è§’åº¦ï¼ˆä¾‹å¦‚30åº¦ï¼‰ï¼Œå‰‡å…è¨±è§’è‰²çˆ¬å¡
             if (slopeAngle < 45f)
             {
                 Debug.Log("There is slope");
@@ -423,18 +421,18 @@ public class PlayerControl : MonoBehaviour
     }
 
     void ResetHeight( Transform refTrandform)
-    {
-        Debug.Log("Reset Height");
-        // ­pºâ¨¤¦â¸}©³ªº°¾²¾¶q¡]°²³]¨¤¦â¤¤¤ß¦b transform.position¡^
-        float characterHeightOffset = 0.18f; // ®Ú¾Ú§A¨¤¦âªº¸}©³¦ì¸m°µ½Õ¾ã
+    {         
+        // è¨ˆç®—è§’è‰²è…³åº•çš„åç§»é‡ï¼ˆå‡è¨­è§’è‰²ä¸­å¿ƒåœ¨ transform.positionï¼‰
+        float characterHeightOffset = 0.18f; // æ ¹æ“šä½ è§’è‰²çš„è…³åº•ä½ç½®åšèª¿æ•´
 
-        // ®g½u©¹¤U°»´ú¡A½T»{¦a­±¦ì¸m
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 2f, LayerMask.GetMask("Terrain"));
+        // å°„ç·šå¾€ä¸‹åµæ¸¬ï¼Œç¢ºèªåœ°é¢ä½ç½®
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 2f, LayerMask.GetMask("Terrain_Ground"));
         if (hit.collider != null)
         {
-            // ±N¨¤¦âªº y ®y¼Ğ³]©w¬°¡G¦a­±¦ì¸m + ¸}©³°¾²¾
+            // å°‡è§’è‰²çš„ y åº§æ¨™è¨­å®šç‚ºï¼šåœ°é¢ä½ç½® + è…³åº•åç§»
             float correctY = hit.point.y + characterHeightOffset;
             transform.position = new Vector3(transform.position.x, correctY, transform.position.z);
+            Debug.Log("Reset Height");
         }
     }
 }
