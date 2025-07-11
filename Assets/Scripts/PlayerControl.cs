@@ -11,16 +11,20 @@ public class PlayerControl : MonoBehaviour
     PrefabManager PrefabMgr;
 
     public Animator PlrAnim;
-    public bool isOnAir = true;
-    public Gravity gravity;
+
     public bool isFaceRight = false;
     public bool isRushing = false;
     private float rushTime = 0.5f;
 
-    private float jumpSpeed = 0;
+    //跳躍控制
+    public JumpParameter jumpParameter;
+    private float jumpTimer = 0f;
+    private float currentYSpeed = 0f;
+    public bool isJumping = false;
+    public bool isFalling = true;
 
-    private Rigidbody2D rb;
-    public float slopeCheckDistance = 2f;    
+    //private Rigidbody2D rb;
+    public float slopeCheckDistance = 2f;
     bool isSloap = false;
 
     //角色相關物件
@@ -48,7 +52,7 @@ public class PlayerControl : MonoBehaviour
     {
         InputMgr = GameObject.Find("InputManager").GetComponent<InputManager>();
         PrefabMgr = GameObject.Find("PrefabManager").GetComponent<PrefabManager>();
-        rb = GetComponent<Rigidbody2D>();
+        //rb = GetComponent<Rigidbody2D>();
         isFaceRight = false;
     }
 
@@ -63,10 +67,10 @@ public class PlayerControl : MonoBehaviour
         sloapAngle = CheckSlope();
 
         //移動方向
-        direction = InputMgr.GetDirection();        
-        if (!isOnAir)
+        direction = InputMgr.GetDirection();
+        if (!IsOnAir())
         {
-            
+
         }
         if (!isRushing)
         {
@@ -101,21 +105,21 @@ public class PlayerControl : MonoBehaviour
                     }
                     else if (sloapAngle <= 45)
                     {
-                        
+
                         this.gameObject.transform.Translate(new Vector2(isFaceRight ? 1 : -1, Mathf.Tan(sloapAngle)) * Time.deltaTime * moveSpeed);
                     }
                 }
-                if (!isOnAir)
+                if (!IsOnAir())
                 {
                     PlrAnim.SetInteger("ActionCode", 1);
-                }                
+                }
             }
             else if (direction == 5)
             {
-                if (!isOnAir && !isAttacking)
+                if (!IsOnAir() && !isAttacking)
                 {
                     PlrAnim.SetInteger("ActionCode", 0);
-                }                
+                }
             }
         }
 
@@ -127,7 +131,7 @@ public class PlayerControl : MonoBehaviour
             {
                 isRushing = true;
                 PlrAnim.SetInteger("ActionCode", 3);
-                PrefabMgr.setEff(1, DustPos,isFaceRight);
+                PrefabMgr.setEff(1, DustPos, isFaceRight);
                 /*
                 if (plrDebugOption != null && plrDebugOption.GetSpecialRush() == true)
                 {
@@ -165,23 +169,33 @@ public class PlayerControl : MonoBehaviour
         //跳躍
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (gravity.isOnAir == false)
+            isJumping = true;
+            jumpTimer = 0f;
+            PlrAnim.SetInteger("ActionCode", 2);
+        }
+
+        if (isJumping)
+        {
+            jumpTimer += Time.deltaTime;
+            // 逐漸減速（上升）
+            float jumpProgress = jumpTimer / jumpParameter.jumpDuration;
+            currentYSpeed = Mathf.Lerp(jumpParameter.jumpHeight / jumpParameter.jumpDuration, 0, jumpProgress);
+            transform.Translate(Vector2.up * currentYSpeed * Time.deltaTime);
+            if (jumpProgress >= 1f)
             {
-                jumpSpeed = 100;
-                this.gameObject.transform.Translate(new Vector2(0, 1) * Time.deltaTime * jumpSpeed);
-                isOnAir = true;
-                gravity.isOnAir = true;
-                PlrAnim.SetInteger("ActionCode", 2);
+                isJumping = false;
+                isFalling = true;
             }
         }
-        if (gravity.isOnAir)
-        {            
-            this.gameObject.transform.Translate(new Vector2(0, 1) * Time.deltaTime * jumpSpeed);
-            jumpSpeed = jumpSpeed + gravity.dropAcceler;
-            //Debug.Log("JumpSpeed:" + jumpSpeed);
-            if (jumpSpeed <= 0)
+        else if (isFalling)
+        {
+            transform.Translate(Vector2.down * jumpParameter.fallSpeed * Time.deltaTime);
+            if (IsGrounded())
             {
-                jumpSpeed = gravity.dropSpeed;
+                isFalling = false;
+                currentYSpeed = 0f;
+                jumpTimer = 0f;
+                ResetHeight();
             }
         }
         #endregion move
@@ -196,20 +210,20 @@ public class PlayerControl : MonoBehaviour
                 isAttacking = true;
             }
             //站立狀態
-            if (direction == 5 && !isRushing &&!isOnAir)
-            {                
+            if (direction == 5 && !isRushing && !IsOnAir())
+            {
                 if (comboCount == 0)
                 {
                     comboAttack = false;
                     Debug.Log("First Slash");
                     PlrAnim.SetInteger("ActionCode", 6);
-                }   
-                
+                }
+
                 if (AttackRunTime > 0 && comboCount < 2)
                 {
                     AttackRunTime = 0; //連擊會刷新攻擊判定時間
                     comboAttack = true;
-                    comboCount++;                    
+                    comboCount++;
                     if (comboCount > 2)
                     {
                         comboCount = 0;
@@ -218,27 +232,27 @@ public class PlayerControl : MonoBehaviour
                     PlrAnim.SetInteger("ActionCode", 6 + comboCount);
 
                 }
-                
+
             }
-            if(!isOnAir &&(direction == 4 || direction == 6))
+            if (!IsOnAir() && (direction == 4 || direction == 6))
             {
-                PlrAnim.SetInteger("ActionCode",10 );
+                PlrAnim.SetInteger("ActionCode", 10);
             }
-            else if(isRushing)
+            else if (isRushing)
             {
-                PlrAnim.SetInteger("ActionCode",12 );
+                PlrAnim.SetInteger("ActionCode", 12);
             }
-            else if(isOnAir)
+            else if (IsOnAir())
             {
-                PlrAnim.SetInteger("ActionCode",14 );
+                PlrAnim.SetInteger("ActionCode", 14);
             }
 
         }
 
-        //處理攻擊動畫銜接
+        //TODO處理攻擊動畫銜接
 
         //Note 目前同一12f(0.2s)
-        if(isAttacking)
+        if (isAttacking)
         {
             AttackRunTime = AttackRunTime + Time.deltaTime;
             if (AttackRunTime >= AttackTime)
@@ -253,14 +267,14 @@ public class PlayerControl : MonoBehaviour
                 {
                     PlrAnim.SetInteger("ActionCode", 3);
                 }
-                if (isOnAir)
+                if (IsOnAir())
                 {
                     PlrAnim.SetInteger("ActionCode", 2);
                 }
             }
         }
 
-        
+
 
         //射擊
         if (Input.GetKeyDown(KeyCode.Mouse1))
@@ -274,21 +288,21 @@ public class PlayerControl : MonoBehaviour
                 isShooting = true;
             }
             //站立狀態
-            if (direction == 5 && !isRushing && !isOnAir)
+            if (direction == 5 && !isRushing && !IsOnAir())
             {
                 PlrAnim.SetInteger("ActionCode", 9);
             }
-            else if (!isOnAir && (direction == 4 || direction == 6))
+            else if (!IsOnAir() && (direction == 4 || direction == 6))
             {
-                PlrAnim.SetInteger("ActionCode",11 );
+                PlrAnim.SetInteger("ActionCode", 11);
             }
             else if (isRushing)
             {
-                PlrAnim.SetInteger("ActionCode",13 );
+                PlrAnim.SetInteger("ActionCode", 13);
             }
-            else if (isOnAir)
+            else if (IsOnAir())
             {
-                PlrAnim.SetInteger("ActionCode",15 );
+                PlrAnim.SetInteger("ActionCode", 15);
             }
             ShootBullet();
         }
@@ -296,7 +310,7 @@ public class PlayerControl : MonoBehaviour
         //持續射擊
         if (Input.GetKey(KeyCode.Mouse1))
         {
-            if (isShooting && isRushing == false && isOnAir == false)
+            if (isShooting && isRushing == false && (isJumping || isFalling) == false)
             {
                 OnShootingPress();
             }
@@ -304,7 +318,7 @@ public class PlayerControl : MonoBehaviour
 
         if (Input.GetKeyUp(KeyCode.Mouse1))
         {
-            if(isShooting)
+            if (isShooting)
             {
                 isShooting = false;
                 ShootTime = 0;
@@ -332,11 +346,11 @@ public class PlayerControl : MonoBehaviour
             ShootTime = 0;
             ShootBullet();
         }
-        if (direction == 5 && !isRushing && !isOnAir)
+        if (direction == 5 && !isRushing && !IsOnAir())
         {
             PlrAnim.SetInteger("ActionCode", 9);
         }
-        else if (!isOnAir && (direction == 4 || direction == 6))
+        else if (!IsOnAir() && (direction == 4 || direction == 6))
         {
             PlrAnim.SetInteger("ActionCode", 11);
         }
@@ -345,10 +359,8 @@ public class PlayerControl : MonoBehaviour
     void OnTriggerEnter2D(Collider2D col)
     {
         Debug.Log("OnTriggerEnter2D");
-        if (col.gameObject.tag == "Terrain_Ground")
+        if (col.gameObject.CompareTag("Terrain_Ground") == true)
         {
-            isOnAir = false;
-            gravity.isOnAir = false;
             if (isAttacking)
             {
                 isAttacking = false;
@@ -370,24 +382,31 @@ public class PlayerControl : MonoBehaviour
             {
                 PlrAnim.SetInteger("ActionCode", 0);
             }
-            //reset hieght
-            if (!isOnAir)
-            {
-                ResetHeight(col.transform);
-            }
-                
         }
     }
 
     void OnTriggerExit2D(Collider2D col)
     {
         Debug.Log("OnTriggerExit2D");
-        if (col.gameObject.tag == "Terrain_Ground" && isOnAir == false)
+        if (col.gameObject.CompareTag("Terrain_Ground") == true && !isJumping)
         {
-            isOnAir = true;
-            gravity.isOnAir = true;
+            isFalling = true;
             PlrAnim.SetInteger("ActionCode", 2);
         }
+    }
+
+    bool IsOnAir()
+    {
+        return (isJumping || isFalling);
+    }
+
+    bool IsGrounded()
+    {
+        Vector2 footPos = new Vector2(ButtonPos.position.x, ButtonPos.position.y);
+        float rayLength = 0.05f;
+        LayerMask groundMask = LayerMask.GetMask("Terrain_Ground");
+
+        return Physics2D.Raycast(footPos, Vector2.down, rayLength, groundMask);
     }
 
     float CheckSlope()
@@ -395,7 +414,7 @@ public class PlayerControl : MonoBehaviour
         float slopeAngle = 90;
         Vector2 position = transform.position;
         if (ButtonPos != null)
-        {            
+        {
             position = ButtonPos.position;
         }
         Vector2 direction = isFaceRight ? Vector2.right : -Vector2.right; ;
@@ -406,7 +425,7 @@ public class PlayerControl : MonoBehaviour
         {
             // 計算坡度角度
             slopeAngle = Vector2.Angle(hit.normal, Vector2.up);
-            Debug.Log("Slope angle: "+ slopeAngle);
+            Debug.Log("Slope angle: " + slopeAngle);
             // 如果坡度角度小於一定的角度（例如30度），則允許角色爬坡
             if (slopeAngle < 45f)
             {
@@ -420,13 +439,12 @@ public class PlayerControl : MonoBehaviour
         return slopeAngle;
     }
 
-    void ResetHeight( Transform refTrandform)
-    {         
-        // 計算角色腳底的偏移量（假設角色中心在 transform.position）
-        float characterHeightOffset = 0.18f; // 根據你角色的腳底位置做調整
+    void ResetHeight()
+    {
+        float characterHeightOffset = 0f;//
 
         // 射線往下偵測，確認地面位置
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 2f, LayerMask.GetMask("Terrain_Ground"));
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 0.05f, LayerMask.GetMask("Terrain_Ground"));
         if (hit.collider != null)
         {
             // 將角色的 y 座標設定為：地面位置 + 腳底偏移
@@ -435,4 +453,5 @@ public class PlayerControl : MonoBehaviour
             Debug.Log("Reset Height");
         }
     }
+
 }

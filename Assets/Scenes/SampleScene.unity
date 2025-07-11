@@ -997,14 +997,12 @@ MonoBehaviour:
   plrStatus: {fileID: 11400000, guid: 686bba2aa3615e74685e7aaf27b03537, type: 2}
   ActionState: {fileID: 11400000, guid: 0dbabdbfe1cb8804ea57455336982890, type: 2}
   PlrAnim: {fileID: 539221388}
-  isOnAir: 1
-  gravity: {fileID: 539221389}
   isFaceRight: 1
   isRushing: 0
+  jumpParameter: {fileID: 11400000, guid: dbc26014a81e7f34cadd560d1c35099d, type: 2}
+  isJumping: 0
+  isFalling: 1
   slopeCheckDistance: 0.1
-  Terrain:
-    serializedVersion: 2
-    m_Bits: 0
   ShootPos: {fileID: 219491340}
   ButtonPos: {fileID: 1325019073}
   DustPos: {fileID: 364160512}
