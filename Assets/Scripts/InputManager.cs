@@ -6,23 +6,6 @@ public class InputManager : MonoBehaviour
 {
     int Direction;
     public PlayerControls playerInput;
-    public static Vector2 DirCodeToVector(int code)
-    {
-        switch (code)
-        {
-            case 6: return Vector2.right;
-            case 4: return Vector2.left;
-            case 8: return Vector2.up;
-            case 2: return Vector2.down;
-            case 1: return new Vector2(-1, -1).normalized;
-            case 3: return new Vector2(1, -1).normalized;
-            case 7: return new Vector2(-1, 1).normalized;
-            case 9: return new Vector2(1, 1).normalized;
-            case 5:
-            default:
-                return Vector2.zero;
-        }
-    }
 
     // 將新系統的 Vector2 轉為 1~9
     public int VectorToDirCode(Vector2 moveInput)
@@ -78,15 +61,17 @@ public class InputManager : MonoBehaviour
         return playerInput.Player.Move.ReadValue<Vector2>();
     }
 
+    // 1. 物理移動專用：直接給出乾淨的 Vector2
+    public Vector2 GetMovementVector()
+    {
+        return GetPlrInputDir();
+    }
+
+    // 2. 邏輯與動畫專用：保留九宮格數字
     public int GetDirection()
     {
         // 轉換成九宮格並回傳
         return VectorToDirCode(GetPlrInputDir());
-    }
-
-    public Vector2 GetDirectionVector()
-    {
-        return DirCodeToVector(VectorToDirCode(GetPlrInputDir()));
     }
 
     public int GetAttackMode()
