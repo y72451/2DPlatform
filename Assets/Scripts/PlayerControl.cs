@@ -41,6 +41,7 @@ public class PlayerControl : MonoBehaviour
     public Transform ShootPos;
     public Transform FrontLegPos;
     public Transform RearLegPos;
+    public Transform CenterGroundPos;
     public Transform DustPos;
 
     //暫時變數
@@ -75,6 +76,7 @@ public class PlayerControl : MonoBehaviour
         float moveSpeed = plrStatus.moveSpeed;
         frontGroundInfo = GroundDetector.DecteGround(FrontLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
         rearGroundInfo = GroundDetector.DecteGround(RearLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        GroundInfo centerGroundInfo = GroundDetector.DecteGround(CenterGroundPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
 
         //處理面向
         Vector2 inputDir = InputMgr.GetMovementVector();
@@ -99,22 +101,16 @@ public class PlayerControl : MonoBehaviour
             {
                 // 1. 建立純粹的世界座標水平輸入向量
                 Vector2 horizontalMove = new Vector2(inputDir.x, 0f);
-                Vector2 moveDir;
+                Vector2 moveDir = horizontalMove.normalized; //預設平行移動(平地或空中)
 
-                if (frontGroundInfo.isGrounded && frontGroundInfo.slopeAngle > 0 && frontGroundInfo.slopeAngle <= 45f)
+                if (centerGroundInfo.isGrounded && centerGroundInfo.slopeAngle > 0 && centerGroundInfo.slopeAngle <= 45f)
                 {
                     // 2. 利用 Vector3.ProjectOnPlane 將水平輸入「投影」到斜坡法線上
                     // 這會自動幫你算出貼合斜坡的完美斜向向量，無論向左或向右都絕對正確
-                    moveDir = Vector3.ProjectOnPlane(horizontalMove, frontGroundInfo.slopeNormal).normalized;
-                    // Debug.Log("Apply SlopeMove (World): " + moveDir);
-                }
-                else
-                {
-                    // 平地或空中
-                    moveDir = horizontalMove.normalized;
-                    // Debug.Log("Apply PlaneMove (World): " + moveDir);
+                    moveDir = Vector3.ProjectOnPlane(horizontalMove, centerGroundInfo.slopeNormal).normalized;
                 }
 
+                // Debug.Log("Apply PlaneMove (World): " + moveDir);
                 // 3. 【關鍵修正】明確指定 Space.World！
                 // 這樣位移就完全不會受到 Flip() 轉 Y 軸的干擾
                 transform.Translate(moveSpeed * Time.deltaTime * moveDir, Space.World);
