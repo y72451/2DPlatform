@@ -5,6 +5,21 @@ using UnityEngine;
 public class InputManager : MonoBehaviour
 {
     int Direction;
+    public PlayerControls playerInput;
+
+    // 將新系統的 Vector2 轉為 1~9
+    public int VectorToDirCode(Vector2 moveInput)
+    {
+        // 使用 Mathf.RoundToInt 處理微小的類比偏差，並將 -1~1 映射到 0~2
+        int x = Mathf.RoundToInt(moveInput.x) + 1; // -1->0, 0->1, 1->2
+        int y = Mathf.RoundToInt(moveInput.y) + 1; // -1->0, 0->1, 1->2
+
+        // 經典公式：x + (y * 3) + 1
+        // (0,0) 中立 -> 1 + (1*3) + 1 = 5
+        // (-1,-1) 左下 -> 0 + (0*3) + 1 = 1
+        // (1,1) 右上 -> 2 + (2*3) + 1 = 9
+        return x + (y * 3) + 1;
+    }
     enum AttackMode
     {
         None,
@@ -15,19 +30,48 @@ public class InputManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+
+    }
+
+    private void Awake()
+    {
+        playerInput = new PlayerControls();
+    }
+
+    private void OnEnable()
+    {
+        playerInput.Enable();
+    }
+
+    private void OnDisable()
+    {
+        playerInput.Disable();
     }
 
     // Update is called once per frame
     void Update()
-    {        
-        detectDirection();
-        detectAttack();
+    {
+        DetectAttack();
     }
 
+    //取得由Iput System監控的輸入資訊
+    Vector2 GetPlrInputDir()
+    {
+        // 直接跟系統要現在的搖桿/按鍵向量
+        return playerInput.Player.Move.ReadValue<Vector2>();
+    }
+
+    // 1. 物理移動專用：直接給出乾淨的 Vector2
+    public Vector2 GetMovementVector()
+    {
+        return GetPlrInputDir();
+    }
+
+    // 2. 邏輯與動畫專用：保留九宮格數字
     public int GetDirection()
     {
-        return Direction;
+        // 轉換成九宮格並回傳
+        return VectorToDirCode(GetPlrInputDir());
     }
 
     public int GetAttackMode()
@@ -35,77 +79,18 @@ public class InputManager : MonoBehaviour
         return (int)attackMode;
     }
 
-    void detectDirection()
+    void DetectAttack()
     {
-        Direction = 5;
-        bool counterBalance = false;
-        if(Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
-        {
-            if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
-            {
-                counterBalance = true;
-            }
-            if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
-            {
-                Direction = counterBalance ? 8 : 9;
-            }
-            else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
-            {
-                Direction = counterBalance ? 2 : 3;
-            }   
-            else
-            {
-                Direction = counterBalance ? 5: 6;
-            }
-        }
-        else if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
-        {
-            if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
-            {
-                counterBalance= true;
-            }
-            if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
-            {
-                Direction = counterBalance ? 8 : 7;
-            }
-            else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
-            {
-                Direction = counterBalance ? 2 : 1;
-            }
-            else
-            {
-                Direction = counterBalance ? 5 : 4;
-            }
-        }
-        else if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
-        {
-            Direction = 8;
-        }
-        else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S)) 
-        {
-            Direction = 2;
-        }       
 
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
-            {
-                Direction = 0;
-            }
-        }
-    }
-
-    void detectAttack()
-    {
-        
-        if (Input.GetKeyDown(KeyCode.Mouse0))
+        if (playerInput.Player.Attack.WasPressedThisFrame())
         {
             attackMode = AttackMode.Slash;
         }
-        else if(Input.GetKeyDown(KeyCode.Mouse1))
+        // WasReleasedThisFrame() 對應舊版的 Input.GetKeyUp()
+        else if (playerInput.Player.Attack.WasReleasedThisFrame())
         {
-            attackMode= AttackMode.Shoot;
+            attackMode = AttackMode.None;
         }
-        
+
     }
 }

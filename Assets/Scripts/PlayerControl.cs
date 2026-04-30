@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using static PlayerControl;
 
 public class PlayerControl : MonoBehaviour
 {
@@ -12,9 +13,19 @@ public class PlayerControl : MonoBehaviour
 
     public Animator PlrAnim;
 
-    public bool isFaceRight = false;
+    //角色方向控制
+    public enum Facing
+    {
+        Left = 1,
+        Right = -1
+    }
+
+    public Facing currentFacing = Facing.Left;
     public bool isRushing = false;
     private float rushTime = 0.5f;
+
+    private GroundInfo frontGroundInfo;
+    private GroundInfo rearGroundInfo;
 
     //跳躍控制
     public JumpParameter jumpParameter;
@@ -24,12 +35,13 @@ public class PlayerControl : MonoBehaviour
     public bool isFalling = true;
 
     //private Rigidbody2D rb;
-    public float slopeCheckDistance = 2f;
-    bool isSloap = false;
+    public float slopeCheckDistance = 15.0f;
 
     //角色相關物件
     public Transform ShootPos;
-    public Transform ButtonPos;
+    public Transform FrontLegPos;
+    public Transform RearLegPos;
+    public Transform CenterGroundPos;
     public Transform DustPos;
 
     //暫時變數
@@ -53,7 +65,6 @@ public class PlayerControl : MonoBehaviour
         InputMgr = GameObject.Find("InputManager").GetComponent<InputManager>();
         PrefabMgr = GameObject.Find("PrefabManager").GetComponent<PrefabManager>();
         //rb = GetComponent<Rigidbody2D>();
-        isFaceRight = false;
     }
 
     // Update is called once per frame
@@ -63,58 +74,53 @@ public class PlayerControl : MonoBehaviour
 
         //
         float moveSpeed = plrStatus.moveSpeed;
-        float sloapAngle = 90;
-        sloapAngle = CheckSlope();
+        frontGroundInfo = GroundDetector.DecteGround(FrontLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        rearGroundInfo = GroundDetector.DecteGround(RearLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        GroundInfo centerGroundInfo = GroundDetector.DecteGround(CenterGroundPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
 
-        //移動方向
+        //處理面向
+        Vector2 inputDir = InputMgr.GetMovementVector();
         direction = InputMgr.GetDirection();
+        if (inputDir.x != 0)
+        {
+            Facing newFacing = inputDir.x > 0 ? Facing.Right : Facing.Left;
+            if (newFacing != currentFacing)
+            {
+                currentFacing = newFacing;
+                Flip(currentFacing);
+            }
+        }
+
         if (!IsOnAir())
         {
 
         }
         if (!isRushing)
         {
-            if (direction != 5 && direction != 0)
+            if (inputDir != Vector2.zero)
             {
-                if (direction == 6)
-                {
-                    if (!isFaceRight)
-                    {
-                        isFaceRight = true;
-                        this.gameObject.transform.rotation = Quaternion.Euler(0, 180, 0);
-                    }
-                    if (sloapAngle == 90)
-                    {
-                        this.gameObject.transform.Translate(new Vector2(isFaceRight ? -1 : 1, 0) * Time.deltaTime * moveSpeed);
-                    }
-                    else if (sloapAngle <= 45)
-                    {
-                        this.gameObject.transform.Translate(new Vector2(isFaceRight ? -1 : 1, Mathf.Abs(Mathf.Tan(sloapAngle))) * Time.deltaTime * moveSpeed);
-                    }
-                }
-                else if (direction == 4)
-                {
-                    if (isFaceRight)
-                    {
-                        isFaceRight = false;
-                        this.gameObject.transform.rotation = Quaternion.Euler(0, 0, 0);
-                    }
-                    if (sloapAngle == 90)
-                    {
-                        this.gameObject.transform.Translate(new Vector2(isFaceRight ? 1 : -1, 0) * Time.deltaTime * moveSpeed);
-                    }
-                    else if (sloapAngle <= 45)
-                    {
+                // 1. 建立純粹的世界座標水平輸入向量
+                Vector2 horizontalMove = new Vector2(inputDir.x, 0f);
+                Vector2 moveDir = horizontalMove.normalized; //預設平行移動(平地或空中)
 
-                        this.gameObject.transform.Translate(new Vector2(isFaceRight ? 1 : -1, Mathf.Tan(sloapAngle)) * Time.deltaTime * moveSpeed);
-                    }
+                if (centerGroundInfo.isGrounded && centerGroundInfo.slopeAngle > 0 && centerGroundInfo.slopeAngle <= 45f)
+                {
+                    // 2. 利用 Vector3.ProjectOnPlane 將水平輸入「投影」到斜坡法線上
+                    // 這會自動幫你算出貼合斜坡的完美斜向向量，無論向左或向右都絕對正確
+                    moveDir = Vector3.ProjectOnPlane(horizontalMove, centerGroundInfo.slopeNormal).normalized;
                 }
+
+                // Debug.Log("Apply PlaneMove (World): " + moveDir);
+                // 3. 【關鍵修正】明確指定 Space.World！
+                // 這樣位移就完全不會受到 Flip() 轉 Y 軸的干擾
+                transform.Translate(moveSpeed * Time.deltaTime * moveDir, Space.World);
+
                 if (!IsOnAir())
                 {
                     PlrAnim.SetInteger("ActionCode", 1);
                 }
             }
-            else if (direction == 5)
+            else if (inputDir == Vector2.zero)
             {
                 if (!IsOnAir() && !isAttacking)
                 {
@@ -131,7 +137,7 @@ public class PlayerControl : MonoBehaviour
             {
                 isRushing = true;
                 PlrAnim.SetInteger("ActionCode", 3);
-                PrefabMgr.setEff(1, DustPos, isFaceRight);
+                PrefabMgr.setEff(1, DustPos, currentFacing == Facing.Right);
                 /*
                 if (plrDebugOption != null && plrDebugOption.GetSpecialRush() == true)
                 {
@@ -190,7 +196,7 @@ public class PlayerControl : MonoBehaviour
         else if (isFalling)
         {
             transform.Translate(Vector2.down * jumpParameter.fallSpeed * Time.deltaTime);
-            if (IsGrounded())
+            if (frontGroundInfo.isGrounded)
             {
                 isFalling = false;
                 currentYSpeed = 0f;
@@ -333,9 +339,14 @@ public class PlayerControl : MonoBehaviour
 
     }
 
+    void Flip(Facing facing)
+    {
+        transform.rotation = Quaternion.Euler(0f, facing == Facing.Right ? 180f : 0f, 0f);
+    }
+
     void ShootBullet()
     {
-        PrefabMgr.setEff(2, ShootPos, isFaceRight);
+        PrefabMgr.setEff(2, ShootPos, currentFacing == Facing.Right);
     }
 
     void OnShootingPress(int ShotWeapon = 0)
@@ -400,51 +411,13 @@ public class PlayerControl : MonoBehaviour
         return (isJumping || isFalling);
     }
 
-    bool IsGrounded()
-    {
-        Vector2 footPos = new Vector2(ButtonPos.position.x, ButtonPos.position.y);
-        float rayLength = 0.05f;
-        LayerMask groundMask = LayerMask.GetMask("Terrain_Ground");
-
-        return Physics2D.Raycast(footPos, Vector2.down, rayLength, groundMask);
-    }
-
-    float CheckSlope()
-    {
-        float slopeAngle = 90;
-        Vector2 position = transform.position;
-        if (ButtonPos != null)
-        {
-            position = ButtonPos.position;
-        }
-        Vector2 direction = isFaceRight ? Vector2.right : -Vector2.right; ;
-        // 建立一條射線檢查坡度
-        RaycastHit2D hit = Physics2D.Raycast(position, direction, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
-
-        if (hit.collider != null)
-        {
-            // 計算坡度角度
-            slopeAngle = Vector2.Angle(hit.normal, Vector2.up);
-            Debug.Log("Slope angle: " + slopeAngle);
-            // 如果坡度角度小於一定的角度（例如30度），則允許角色爬坡
-            if (slopeAngle < 45f)
-            {
-                Debug.Log("There is slope");
-            }
-        }
-        else
-        {
-            Debug.Log("Hit is null");
-        }
-        return slopeAngle;
-    }
 
     void ResetHeight()
     {
-        float characterHeightOffset = 0f;//
+        float characterHeightOffset = 0f;
 
         // 射線往下偵測，確認地面位置
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, 0.05f, LayerMask.GetMask("Terrain_Ground"));
+        RaycastHit2D hit = Physics2D.Raycast(FrontLegPos.position, Vector2.down, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
         if (hit.collider != null)
         {
             // 將角色的 y 座標設定為：地面位置 + 腳底偏移

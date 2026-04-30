@@ -1,11 +1,11 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu]
 public class JumpParameter : ScriptableObject
 {
-    public float jumpHeight = 3f;           // ·Q­n¸õ¦h°ª
-    public float jumpDuration = 0.5f;       // ¤W¤É®É¶¡¡]¬í¡^
-    public float fallSpeed = 6f;            // µ¥³t¤U¸¨³t«×
+    public float jumpHeight = 3f;           // æƒ³è¦è·³å¤šé«˜
+    public float jumpDuration = 0.5f;       // ä¸Šå‡æ™‚é–“ï¼ˆç§’ï¼‰
+    public float fallSpeed = 6f;            // ç­‰é€Ÿä¸‹è½é€Ÿåº¦
 }
