@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 public class InputManager : MonoBehaviour
 {
@@ -27,6 +28,15 @@ public class InputManager : MonoBehaviour
         Shoot,
     }
     AttackMode attackMode = AttackMode.None;
+
+
+    // 定義事件廣播器
+    public event Action OnJumpEvent;
+    public event Action OnSlashEvent;
+    public event Action OnShootStartEvent;
+    public event Action OnShootEndEvent;
+    public event Action OnRushEvent;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -41,11 +51,22 @@ public class InputManager : MonoBehaviour
     private void OnEnable()
     {
         playerInput.Enable();
+        playerInput.Player.Jump.performed += ctx => OnJumpEvent?.Invoke();
+        playerInput.Player.Attack.performed += ctx => OnSlashEvent?.Invoke();
+        playerInput.Player.Shoot.started += ctx => OnShootStartEvent?.Invoke();
+        playerInput.Player.Shoot.canceled += ctx => OnShootEndEvent?.Invoke();
+        playerInput.Player.Rush.performed += ctx => OnRushEvent?.Invoke();
+        
     }
 
     private void OnDisable()
     {
         playerInput.Disable();
+        playerInput.Player.Jump.performed -= ctx => OnJumpEvent?.Invoke();
+        playerInput.Player.Attack.performed -= ctx => OnSlashEvent?.Invoke();
+        playerInput.Player.Shoot.started -= ctx => OnShootStartEvent?.Invoke();
+        playerInput.Player.Shoot.canceled -= ctx => OnShootEndEvent?.Invoke();
+        playerInput.Player.Rush.performed -= ctx => OnRushEvent?.Invoke();
     }
 
     // Update is called once per frame
@@ -92,5 +113,35 @@ public class InputManager : MonoBehaviour
             attackMode = AttackMode.None;
         }
 
+    }
+
+    // 攻擊 (對應原本的 Input.GetKeyDown(KeyCode.Mouse0))
+    public bool IsSlashPressed()
+    {
+        // WasPressedThisFrame() 完美對應舊版的 GetKeyDown
+        return playerInput.Player.Attack.WasPressedThisFrame();
+    }
+
+    public bool IsShootPressed()
+    {
+        // WasPressedThisFrame() 完美對應舊版的 GetKeyDown
+        return playerInput.Player.Shoot.WasPressedThisFrame();
+    }
+
+
+    // 持續射擊 (對應原本的 Input.GetKey(KeyCode.Mouse1))
+    public bool IsShootHeld()
+    {
+        return playerInput.Player.Shoot.IsPressed();
+    }
+
+    public bool IsJumpPressed()
+    {
+        return playerInput.Player.Jump.WasPressedThisFrame();
+    }
+
+    public bool IsRushPressed()
+    {
+        return playerInput.Player.Rush.WasPressedThisFrame();
     }
 }

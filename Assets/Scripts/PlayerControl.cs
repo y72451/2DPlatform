@@ -65,6 +65,23 @@ public class PlayerControl : MonoBehaviour
         InputMgr = GameObject.Find("InputManager").GetComponent<InputManager>();
         PrefabMgr = GameObject.Find("PrefabManager").GetComponent<PrefabManager>();
         //rb = GetComponent<Rigidbody2D>();
+        InputMgr.OnJumpEvent += HandleJump;
+        InputMgr.OnRushEvent += HandleRush;
+        InputMgr.OnSlashEvent += HandleSlash;
+        InputMgr.OnShootStartEvent += HandleShootStart;
+        InputMgr.OnShootEndEvent += HandleShootEnd;
+    }
+
+    private void OnDestroy()
+    {
+        // 養成好習慣：物件銷毀時取消訂閱
+        if (InputMgr != null)
+        {
+            InputMgr.OnJumpEvent -= HandleJump;
+            InputMgr.OnSlashEvent -= HandleSlash;
+            InputMgr.OnShootStartEvent -= HandleShootStart;
+            InputMgr.OnShootEndEvent -= HandleShootEnd;
+        }
     }
 
     // Update is called once per frame
@@ -129,38 +146,6 @@ public class PlayerControl : MonoBehaviour
             }
         }
 
-
-        //衝刺
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            if (!isRushing)
-            {
-                isRushing = true;
-                PlrAnim.SetInteger("ActionCode", 3);
-                PrefabMgr.setEff(1, DustPos, currentFacing == Facing.Right);
-                /*
-                if (plrDebugOption != null && plrDebugOption.GetSpecialRush() == true)
-                {
-                    PlrAnim.SetInteger("ActionCode", 16);
-                }
-                else
-                {
-                    PlrAnim.SetInteger("ActionCode", 3);
-                }      
-                */
-
-                //取消攻擊
-                if (isShooting)
-                {
-                    isShooting = false;
-                    ShootTime = 0;
-                }
-                if (isAttacking)
-                {
-                    isAttacking = false;
-                }
-            }
-        }
         if (isRushing)
         {
             this.gameObject.transform.Translate(new Vector2(-1, 0) * Time.deltaTime * moveSpeed * 3);
@@ -170,14 +155,6 @@ public class PlayerControl : MonoBehaviour
                 rushTime = 0.5f;
                 isRushing = false;
             }
-        }
-
-        //跳躍
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            isJumping = true;
-            jumpTimer = 0f;
-            PlrAnim.SetInteger("ActionCode", 2);
         }
 
         if (isJumping)
@@ -208,53 +185,6 @@ public class PlayerControl : MonoBehaviour
 
         #region attack
 
-        //斬擊
-        if (Input.GetKeyDown(KeyCode.Mouse0))
-        {
-            if (!isAttacking)
-            {
-                isAttacking = true;
-            }
-            //站立狀態
-            if (direction == 5 && !isRushing && !IsOnAir())
-            {
-                if (comboCount == 0)
-                {
-                    comboAttack = false;
-                    Debug.Log("First Slash");
-                    PlrAnim.SetInteger("ActionCode", 6);
-                }
-
-                if (AttackRunTime > 0 && comboCount < 2)
-                {
-                    AttackRunTime = 0; //連擊會刷新攻擊判定時間
-                    comboAttack = true;
-                    comboCount++;
-                    if (comboCount > 2)
-                    {
-                        comboCount = 0;
-                    }
-                    Debug.Log("Slash Combo" + comboCount);
-                    PlrAnim.SetInteger("ActionCode", 6 + comboCount);
-
-                }
-
-            }
-            if (!IsOnAir() && (direction == 4 || direction == 6))
-            {
-                PlrAnim.SetInteger("ActionCode", 10);
-            }
-            else if (isRushing)
-            {
-                PlrAnim.SetInteger("ActionCode", 12);
-            }
-            else if (IsOnAir())
-            {
-                PlrAnim.SetInteger("ActionCode", 14);
-            }
-
-        }
-
         //TODO處理攻擊動畫銜接
 
         //Note 目前同一12f(0.2s)
@@ -280,41 +210,8 @@ public class PlayerControl : MonoBehaviour
             }
         }
 
-
-
-        //射擊
-        if (Input.GetKeyDown(KeyCode.Mouse1))
-        {
-            if (!isAttacking)
-            {
-                isAttacking = true;
-            }
-            if (!isShooting)
-            {
-                isShooting = true;
-            }
-            //站立狀態
-            if (direction == 5 && !isRushing && !IsOnAir())
-            {
-                PlrAnim.SetInteger("ActionCode", 9);
-            }
-            else if (!IsOnAir() && (direction == 4 || direction == 6))
-            {
-                PlrAnim.SetInteger("ActionCode", 11);
-            }
-            else if (isRushing)
-            {
-                PlrAnim.SetInteger("ActionCode", 13);
-            }
-            else if (IsOnAir())
-            {
-                PlrAnim.SetInteger("ActionCode", 15);
-            }
-            ShootBullet();
-        }
-
         //持續射擊
-        if (Input.GetKey(KeyCode.Mouse1))
+        if (isShooting)
         {
             if (isShooting && isRushing == false && (isJumping || isFalling) == false)
             {
@@ -322,8 +219,38 @@ public class PlayerControl : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyUp(KeyCode.Mouse1))
+        #endregion attack
+
+    }
+    //跳躍
+    void HandleJump()
+    {
+        
+        isJumping = true;
+        jumpTimer = 0f;
+        PlrAnim.SetInteger("ActionCode", 2);
+    }
+
+    //衝刺
+    void HandleRush()
+    {
+        if (!isRushing)
         {
+            isRushing = true;
+            PlrAnim.SetInteger("ActionCode", 3);
+            PrefabMgr.setEff(1, DustPos, currentFacing == Facing.Right);
+            /*
+            if (plrDebugOption != null && plrDebugOption.GetSpecialRush() == true)
+            {
+                PlrAnim.SetInteger("ActionCode", 16);
+            }
+            else
+            {
+                PlrAnim.SetInteger("ActionCode", 3);
+            }      
+            */
+
+            //取消攻擊
             if (isShooting)
             {
                 isShooting = false;
@@ -334,9 +261,93 @@ public class PlayerControl : MonoBehaviour
                 isAttacking = false;
             }
         }
+    }
 
-        #endregion attack
+    void HandleSlash()
+    {
+        if (!isAttacking)
+        {
+            isAttacking = true;
+        }
+        //站立狀態
+        if (direction == 5 && !isRushing && !IsOnAir())
+        {
+            if (comboCount == 0)
+            {
+                comboAttack = false;
+                Debug.Log("First Slash");
+                PlrAnim.SetInteger("ActionCode", 6);
+            }
 
+            if (AttackRunTime > 0 && comboCount < 2)
+            {
+                AttackRunTime = 0; //連擊會刷新攻擊判定時間
+                comboAttack = true;
+                comboCount++;
+                if (comboCount > 2)
+                {
+                    comboCount = 0;
+                }
+                Debug.Log("Slash Combo" + comboCount);
+                PlrAnim.SetInteger("ActionCode", 6 + comboCount);
+
+            }
+
+        }
+        if (!IsOnAir() && (direction == 4 || direction == 6))
+        {
+            PlrAnim.SetInteger("ActionCode", 10);
+        }
+        else if (isRushing)
+        {
+            PlrAnim.SetInteger("ActionCode", 12);
+        }
+        else if (IsOnAir())
+        {
+            PlrAnim.SetInteger("ActionCode", 14);
+        }
+    }
+
+    void HandleShootStart()
+    {
+        if (!isAttacking)
+        {
+            isAttacking = true;
+        }
+        if (!isShooting)
+        {
+            isShooting = true;
+        }
+        //站立狀態
+        if (direction == 5 && !isRushing && !IsOnAir())
+        {
+            PlrAnim.SetInteger("ActionCode", 9);
+        }
+        else if (!IsOnAir() && (direction == 4 || direction == 6))
+        {
+            PlrAnim.SetInteger("ActionCode", 11);
+        }
+        else if (isRushing)
+        {
+            PlrAnim.SetInteger("ActionCode", 13);
+        }
+        else if (IsOnAir())
+        {
+            PlrAnim.SetInteger("ActionCode", 15);
+        }
+        ShootBullet();
+    }
+
+    void HandleShootEnd()
+    {
+        isShooting = false;
+        ShootTime = 0f; // 重置計時器
+
+        // 注意：你原本的代碼在這裡強制把 isAttacking 設為 false。
+        // 這可能會導致：如果玩家同時在揮劍又放開射擊鍵，揮劍狀態會被硬生生中斷。
+        // 你可能需要更精細的狀態管理（例如區分 isMeleeAttacking 和 isShooting），
+        // 但為了符合你原本的邏輯，這裡先保留：
+        isAttacking = false;
     }
 
     void Flip(Facing facing)
