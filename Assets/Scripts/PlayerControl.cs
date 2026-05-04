@@ -53,8 +53,8 @@ public class PlayerControl : MonoBehaviour
     private float attackDuration = 0.2f;        //攻擊動畫時間
 
     private float comboTimer = 0f;           //連擊計時器
-    private float comboWindowDelay = 0.2f;   //可以繼續派成連擊的窗口時間
-    private int comboCount = 0;                 //斬擊連擊次數
+    private float comboWindowDelay = 0.5f;   //可以繼續派成連擊的窗口時間
+    private int comboCount = 0;              //斬擊連擊次數
     
     private bool isComboAttack = false;           //是否需要在下一次進行連擊
 
@@ -138,7 +138,7 @@ public class PlayerControl : MonoBehaviour
                 // 這樣位移就完全不會受到 Flip() 轉 Y 軸的干擾
                 transform.Translate(moveSpeed * Time.deltaTime * moveDir, Space.World);
 
-                if (!IsOnAir())
+                if (!IsOnAir() && !isAttacking)
                 {
                     PlrAnim.SetInteger("ActionCode", 1);
                 }
@@ -209,50 +209,38 @@ public class PlayerControl : MonoBehaviour
             attackTimer = attackTimer + Time.deltaTime;
             if (attackTimer >= attackDuration)
             {
+                Debug.Log("AttackTimer:" + attackTimer);
+                isAttacking = false;
+                attackTimer = 0f;
+                comboTimer = 0f; // 動畫結束的瞬間，啟動連擊記憶倒數
 
-                // 動畫播完了 (0.2s)
-                if (attackTimer >= attackDuration)
+                // 檢查剛才有沒有預先輸入 (Input Buffering)
+                if (isComboAttack && comboCount > 0 && comboCount < 3)
                 {
-                    // 【關鍵解方】立刻解除攻擊硬直，重置計時器
-                    isAttacking = false;
-                    attackTimer = 0f;
-                    comboTimer = 0f; // 動畫結束的瞬間，啟動連擊記憶倒數
-
-                    // 檢查剛才有沒有預先輸入 (Input Buffering)
-                    if (isComboAttack && comboCount < 3)
+                    // 有預先輸入，處理連擊
+                    ExecuteNextSlash();
+                }
+                else
+                {
+                    if (isRushing)
                     {
-                        // 有預先輸入，直接無縫接軌下一擊！
-                        ExecuteNextSlash();
+                        PlrAnim.SetInteger("ActionCode", 3);
+                    }
+                    else if (IsOnAir())
+                    {
+                        PlrAnim.SetInteger("ActionCode", 2);
+                        Debug.Log("Back to jump position");
+                        //Debug.Break();
                     }
                     else
                     {
-                        // 沒預先輸入，正常回到待機狀態 (解決卡動畫的問題)
                         PlrAnim.SetInteger("ActionCode", 0);
-
-                        /*
-                         * //結束攻擊動作
-                        isAttacking = false;
-                        isComboAttack = false;
-                        attackTimer = 0;                    
-                        comboCount = 0;
-
-
-                        // 讓角色回到待機動畫
-                        PlrAnim.SetInteger("ActionCode", 0);
-                        Debug.Log("End of AttackAnim");
-                         */
                     }
-                }                
 
+                    Debug.Log("End of AttackAnim");
+                    Debug.Break();
+                }
 
-                if (isRushing)
-                {
-                    PlrAnim.SetInteger("ActionCode", 3);
-                }
-                if (IsOnAir())
-                {
-                    PlrAnim.SetInteger("ActionCode", 2);
-                }
             }
         }
 
@@ -311,33 +299,50 @@ public class PlayerControl : MonoBehaviour
 
     void HandleSlash()
     {
-        if (direction != 5 || isRushing || IsOnAir())
+        //連擊的判斷處理
+        if( isAttacking )
         {
-            if (!IsOnAir() && (direction == 4 || direction == 6))
+            if(comboCount > 0 && comboCount <3)
             {
-                PlrAnim.SetInteger("ActionCode", 10);
-            }
-            else if (isRushing)
-            {
-                PlrAnim.SetInteger("ActionCode", 12);
-            }
-            else if (IsOnAir())
-            {
-                PlrAnim.SetInteger("ActionCode", 14);
+                isComboAttack = true;
             }
             return;
         }
 
-        //站立狀態
-        if (!isAttacking)
-        {
-            ExecuteNextSlash();
+        //第一擊的處理流程
 
-        }
-        else 
+        isAttacking = true;
+        attackTimer = 0f;
+        //comboTimer = 0f;
+        isComboAttack = false;
+
+
+        // 判斷要發動哪一種攻擊，並設定對應的狀態
+        if (IsOnAir())
         {
-            if (comboCount < 2)
-                isComboAttack = true;
+            PlrAnim.SetInteger("ActionCode", 14); // 空中砍
+            comboCount = -1; // -1 代表「這是特殊攻擊，沒有下一段」
+                             // Debug.Log("Air Slash");
+            //Debug.Break();
+        }
+        else if (isRushing)
+        {
+            PlrAnim.SetInteger("ActionCode", 12); // 衝刺砍
+            comboCount = -1;
+            // Debug.Log("Rush Slash");
+        }
+        else if (direction == 4 || direction == 6)
+        {
+            PlrAnim.SetInteger("ActionCode", 10); // 跑砍
+            comboCount = -1;
+            // Debug.Log("Run Slash");
+        }
+        else
+        {
+            // 站立狀態 (direction == 5)
+            PlrAnim.SetInteger("ActionCode", 6); // 平砍第一段
+            comboCount = 1; // 記錄：已經打完第1段，準備好接第2段
+                            // Debug.Log("First Slash");
         }
 
     }
@@ -391,19 +396,16 @@ public class PlayerControl : MonoBehaviour
 
     void ExecuteNextSlash()
     {
+
         isAttacking = true;
         attackTimer = 0f;
-        comboTimer = 0f;
         isComboAttack = false;
 
-        if (comboCount < 3)
-        {
-            // 根據目前的段數播放動畫 (0 播 6, 1 播 7, 2 播 8)
-            PlrAnim.SetInteger("ActionCode", 6 + comboCount);
+        // 如果目前 comboCount 是 1，播 ActionCode 7 (第二刀)
+        // 如果目前 comboCount 是 2，播 ActionCode 8 (第三刀)
+        PlrAnim.SetInteger("ActionCode", 6 + comboCount);
 
-            // 播放完後將段數 +1，準備給下一次判斷使用
-            comboCount++;
-        }
+        comboCount++; // 打完後段數繼續往上加
 
     }
 
