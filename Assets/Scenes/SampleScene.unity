@@ -1061,6 +1061,8 @@ MonoBehaviour:
   RearLegPos: {fileID: 981707134}
   CenterGroundPos: {fileID: 479440442}
   DustPos: {fileID: 364160512}
+  isAttacking: 0
+  isComboAttack: 0
   plrDebugOption: {fileID: 539221392}
 --- !u!95 &539221388
 Animator:

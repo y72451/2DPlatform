@@ -45,7 +45,7 @@ public class PlayerControl : MonoBehaviour
     public Transform DustPos;
 
     //暫時變數
-    private bool isAttacking = false;
+    public bool isAttacking = false;
     private bool isShooting = false;
 
     //攻擊變數
@@ -53,10 +53,10 @@ public class PlayerControl : MonoBehaviour
     private float attackDuration = 0.2f;        //攻擊動畫時間
 
     private float comboTimer = 0f;           //連擊計時器
-    private float comboWindowDelay = 0.5f;   //可以繼續派成連擊的窗口時間
+    private float comboWindowDelay = 2.5f;   //可以繼續派成連擊的窗口時間
     private int comboCount = 0;              //斬擊連擊次數
     
-    private bool isComboAttack = false;           //是否需要在下一次進行連擊
+    public bool isComboAttack = false;           //是否需要在下一次進行連擊
 
     private bool spcialRush = false;
 
@@ -93,13 +93,17 @@ public class PlayerControl : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        /*Review
+        避免在Update中時刻處理核心邏輯，嘗試改用事件驅動
+        設置進入點跟離開點
+         */
         #region move
 
         //
         float moveSpeed = plrStatus.moveSpeed;
-        frontGroundInfo = GroundDetector.DecteGround(FrontLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
-        rearGroundInfo = GroundDetector.DecteGround(RearLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
-        GroundInfo centerGroundInfo = GroundDetector.DecteGround(CenterGroundPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        frontGroundInfo = GroundDetector.DetectGround(FrontLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        rearGroundInfo = GroundDetector.DetectGround(RearLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        GroundInfo centerGroundInfo = GroundDetector.DetectGround(CenterGroundPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
 
         //處理面向
         Vector2 inputDir = InputMgr.GetMovementVector();
@@ -192,26 +196,32 @@ public class PlayerControl : MonoBehaviour
         #region attack
         //Note 目前同一12f(0.2s)
 
-        if (!isAttacking && comboCount > 0)
+        if (isAttacking && comboCount > 0)
         {
             comboTimer += Time.deltaTime;
             if (comboTimer >= comboWindowDelay)
             {
                 // 寬限期真的過了，徹底忘記連擊
                 comboCount = 0;
-                // Debug.Log("Combo Memory Lost");
+                isAttacking = false;
+                Debug.Log("Combo Memory Lost");
             }
         }
 
 
+        /*summary
+         攻擊之後會開始計時動畫時間，時間到之後回歸原本的動畫
+         
+         */
+        
+        
         if (isAttacking)
         {
             attackTimer = attackTimer + Time.deltaTime;
             if (attackTimer >= attackDuration)
             {
                 Debug.Log("AttackTimer:" + attackTimer);
-                isAttacking = false;
-                attackTimer = 0f;
+                isAttacking= false;
                 comboTimer = 0f; // 動畫結束的瞬間，啟動連擊記憶倒數
 
                 // 檢查剛才有沒有預先輸入 (Input Buffering)
@@ -238,7 +248,7 @@ public class PlayerControl : MonoBehaviour
                     }
 
                     Debug.Log("End of AttackAnim");
-                    Debug.Break();
+                    //Debug.Break();
                 }
 
             }
@@ -313,7 +323,7 @@ public class PlayerControl : MonoBehaviour
 
         isAttacking = true;
         attackTimer = 0f;
-        //comboTimer = 0f;
+        comboTimer = 0f;
         isComboAttack = false;
 
 
@@ -373,6 +383,7 @@ public class PlayerControl : MonoBehaviour
         else if (IsOnAir())
         {
             PlrAnim.SetInteger("ActionCode", 15);
+            
         }
         ShootBullet();
     }

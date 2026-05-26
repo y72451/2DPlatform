@@ -11,7 +11,7 @@ public class GroundInfo
 }
 public static class GroundDetector
 {
-    public static GroundInfo DecteGround(Transform origin, float checkDistance, LayerMask groundMask)
+    public static GroundInfo DetectGround(Transform origin, float checkDistance, LayerMask groundMask)
     {
         GroundInfo info = new GroundInfo();
         RaycastHit2D hit = Physics2D.Raycast(origin.position, Vector2.down, checkDistance, groundMask);
