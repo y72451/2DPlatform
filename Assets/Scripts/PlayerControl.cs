@@ -44,11 +44,6 @@ public class PlayerControl : MonoBehaviour
     public Transform CenterGroundPos;
     public Transform DustPos;
 
-
-    //暫時變數
-    public bool isAttacking = false;
-    private bool isShooting = false;
-
     //攻擊變數
     private float attackTimer = 0f;             //實際攻擊動作執行時間
     private float attackDuration = 0.2f;        //攻擊動畫時間
@@ -74,7 +69,6 @@ public class PlayerControl : MonoBehaviour
         //rb = GetComponent<Rigidbody2D>();
         InputMgr.OnJumpEvent += HandleJump;
         InputMgr.OnRushEvent += HandleRush;
-        InputMgr.OnSlashEvent += HandleSlash;
         InputMgr.OnShootStartEvent += HandleShootStart;
         InputMgr.OnShootEndEvent += HandleShootEnd;
     }
@@ -85,7 +79,6 @@ public class PlayerControl : MonoBehaviour
         if (InputMgr != null)
         {
             InputMgr.OnJumpEvent -= HandleJump;
-            InputMgr.OnSlashEvent -= HandleSlash;
             InputMgr.OnShootStartEvent -= HandleShootStart;
             InputMgr.OnShootEndEvent -= HandleShootEnd;
         }
@@ -112,76 +105,10 @@ public class PlayerControl : MonoBehaviour
         #endregion move
 
         #region attack
-        //Note 目前同一12f(0.2s)
-
-        if (isAttacking && comboCount > 0)
-        {
-            comboTimer += Time.deltaTime;
-            if (comboTimer >= comboWindowDelay)
-            {
-                // 寬限期真的過了，徹底忘記連擊
-                comboCount = 0;
-                isAttacking = false;
-                Debug.Log("Combo Memory Lost");
-            }
-        }
-
-
-        /*summary
-         攻擊之後會開始計時動畫時間，時間到之後回歸原本的動畫
-         
-         */
-        
-        
-        if (isAttacking)
-        {
-            attackTimer = attackTimer + Time.deltaTime;
-            if (attackTimer >= attackDuration)
-            {
-                Debug.Log("AttackTimer:" + attackTimer);
-                isAttacking= false;
-                comboTimer = 0f; // 動畫結束的瞬間，啟動連擊記憶倒數
-
-                // 檢查剛才有沒有預先輸入 (Input Buffering)
-                if (isComboAttack && comboCount > 0 && comboCount < 3)
-                {
-                    // 有預先輸入，處理連擊
-                    ExecuteNextSlash();
-                }
-                else
-                {
-                    if (currentMoveState == MovementState.Rush)
-                    {
-                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Rush);
-                    }
-                    else if (IsOnAir())
-                    {
-                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump);
-                        Debug.Log("Back to jump position");
-                        //Debug.Break();
-                    }
-                    else
-                    {
-                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
-                    }
-
-                    Debug.Log("End of AttackAnim");
-                    //Debug.Break();
-                }
-
-            }
-        }
-
-        //持續射擊
-        if (isShooting)
-        {
-            if (isShooting && currentMoveState == MovementState.Rush == false && (IsOnAir()) == false)
-            {
-                OnShootingPress();
-            }
-        }
-
+        CheckCombatTransitions();
+        ExecuteCombatState();
         #endregion attack
+
 
     }
     //跳躍
@@ -204,109 +131,30 @@ public class PlayerControl : MonoBehaviour
             PrefabMgr.setEff(1, DustPos, currentFacing == Facing.Right);
 
             //取消攻擊
-            if (isShooting)
+            if (currentCombatState != CombatState.None)
             {
-                isShooting = false;
-                ShootTime = 0;
-            }
-            if (isAttacking)
-            {
-                isAttacking = false;
+                CancelAttack();
             }
         }
     }
 
-    void HandleSlash()
-    {
-        //連擊的判斷處理
-        if( isAttacking )
-        {
-            if(comboCount > 0 && comboCount <3)
-            {
-                isComboAttack = true;
-            }
-            return;
-        }
-
-        //第一擊的處理流程
-
-        isAttacking = true;
-        attackTimer = 0f;
-        comboTimer = 0f;
-        isComboAttack = false;
-
-
-        // 判斷要發動哪一種攻擊，並設定對應的狀態
-        if (IsOnAir())
-        {
-            PlrAnim.SetInteger("ActionCode", 14); // 空中砍
-            comboCount = -1; // -1 代表「這是特殊攻擊，沒有下一段」
-                             // Debug.Log("Air Slash");
-            //Debug.Break();
-        }
-        else if (currentMoveState == MovementState.Rush)
-        {
-            PlrAnim.SetInteger("ActionCode", 12); // 衝刺砍
-            comboCount = -1;
-            // Debug.Log("Rush Slash");
-        }
-        else if (direction == 4 || direction == 6)
-        {
-            PlrAnim.SetInteger("ActionCode", 10); // 跑砍
-            comboCount = -1;
-            // Debug.Log("Run Slash");
-        }
-        else
-        {
-            // 站立狀態 (direction == 5)
-            PlrAnim.SetInteger("ActionCode", 6); // 平砍第一段
-            comboCount = 1; // 記錄：已經打完第1段，準備好接第2段
-                            // Debug.Log("First Slash");
-        }
-
-    }
 
     void HandleShootStart()
     {
-        if (!isAttacking)
-        {
-            isAttacking = true;
-        }
-        if (!isShooting)
-        {
-            isShooting = true;
-        }
-        //站立狀態
-        if (direction == 5 && currentMoveState != MovementState.Rush && !IsOnAir())
-        {
-            PlrAnim.SetInteger("ActionCode", 9);
-        }
-        else if (!IsOnAir() && (direction == 4 || direction == 6))
-        {
-            PlrAnim.SetInteger("ActionCode", 11);
-        }
-        else if (currentMoveState == MovementState.Rush)
-        {
-            PlrAnim.SetInteger("ActionCode", 13);
-        }
-        else if (IsOnAir())
-        {
-            PlrAnim.SetInteger("ActionCode", 15);
-            
-        }
+        currentCombatState = CombatState.Shoot;
+
+        // 立即擊發第一發子彈，消除輸入延遲
         ShootBullet();
+
+        // 重置連發計時器，這樣 ExecuteCombatState 才會乖乖等 0.15 秒後再開第二槍
+        ShootTime = 0f;
+
     }
 
     void HandleShootEnd()
     {
-        isShooting = false;
-        ShootTime = 0f; // 重置計時器
-
-        // 注意：你原本的代碼在這裡強制把 isAttacking 設為 false。
-        // 這可能會導致：如果玩家同時在揮劍又放開射擊鍵，揮劍狀態會被硬生生中斷。
-        // 你可能需要更精細的狀態管理（例如區分 isMeleeAttacking 和 isShooting），
-        // 但為了符合你原本的邏輯，這裡先保留：
-        isAttacking = false;
+        if (currentCombatState == CombatState.Shoot)
+            CancelAttack();
     }
 
     void Flip(Facing facing)
@@ -359,11 +207,12 @@ public class PlayerControl : MonoBehaviour
             // 如果沒在攻擊，切回待機動畫
             if (currentCombatState == CombatState.None)
             {
-                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
+                CancelAttack();                
             }
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
         }
 
-        // 4. 處理滯空與落地 (結合你之前修好的中心點射線)
+        // 4. 處理滯空與落地
         if (IsOnAir())
         {
             if (centerGroundInfo.isGrounded && currentMoveState == MovementState.Fall)
@@ -420,7 +269,6 @@ public class PlayerControl : MonoBehaviour
                 break;
 
             case MovementState.Run:
-                // 塞入你之前寫好的完美斜坡投影邏輯
                 Vector2 horizontalMove = new Vector2(inputDir.x, 0f);
                 Vector2 moveDir = horizontalMove.normalized;
 
@@ -430,7 +278,6 @@ public class PlayerControl : MonoBehaviour
             case MovementState.Jump:
 
                 HorizontalMovement(inputDir, 0.8f,moveSpeed);
-                // 塞入跳躍上升邏輯
                 jumpTimer += Time.deltaTime;
                 float jumpProgress = jumpTimer / jumpParameter.jumpDuration;
                 currentYSpeed = Mathf.Lerp(jumpParameter.jumpHeight / jumpParameter.jumpDuration, 0, jumpProgress);
@@ -445,12 +292,10 @@ public class PlayerControl : MonoBehaviour
             case MovementState.Fall:
 
                 HorizontalMovement(inputDir, 0.8f,moveSpeed);
-                // 塞入重力下墜邏輯
                 transform.Translate(Vector2.down * jumpParameter.fallSpeed * Time.deltaTime);
                 break;
 
             case MovementState.Rush:
-                // 塞入衝刺邏輯
                 transform.Translate(new Vector2((int)currentFacing * -1, 0) * Time.deltaTime * moveSpeed * 3, Space.World);
                 rushTime -= Time.deltaTime;
                 if (rushTime <= 0)
@@ -462,6 +307,185 @@ public class PlayerControl : MonoBehaviour
                 break;
         }
     }
+
+
+    private void CheckCombatTransitions()
+    {
+        // ----------------------------------------
+        // 處理近戰斬擊 (Slash)
+        // ----------------------------------------
+        if (InputMgr.IsSlashPressed())
+        {
+            // 情況 A：目前不在攻擊狀態 (發動新一擊，或是延遲派生的下一擊)
+            if (currentCombatState == CombatState.None)
+            {
+                // ==========================================
+                // 【關鍵修復】將「特殊攻擊」與「平地連擊」分流
+                // ==========================================
+
+                // 如果是空中、跑動、衝刺，無視段數，強制發動特殊攻擊
+                if (IsOnAir() || currentMoveState == MovementState.Run || currentMoveState == MovementState.Rush)
+                {
+                    // 先傳 Slash1 進去當作啟動器，StartSlashState 裡面會自動把它替換成正確的動畫
+                    StartSlashState(CombatState.Slash1);
+                }
+                // 正常站在地上的連擊邏輯
+                else
+                {
+                    // 加上 comboCount == -1 的防呆，避免上一刀是跑砍/跳斬，落地後卡住不能攻擊
+                    if (comboCount == 0 || comboCount >= 3 || comboCount == -1)
+                    {
+                        comboCount = 0;
+                        StartSlashState(CombatState.Slash1);
+                    }
+                    else if (comboCount == 1) StartSlashState(CombatState.Slash2);
+                    else if (comboCount == 2) StartSlashState(CombatState.Slash3);
+                }
+            }
+            // 情況 B：目前正在攻擊中 (玩家狂按按鍵 -> Input Buffering 預先輸入)
+            else
+            {
+                if (comboCount < 3 && comboCount != -1)
+                {
+                    isComboAttack = true; // 記住玩家已經按了下一刀
+                }
+            }
+        }
+        if (InputMgr.IsShootPressed()) 
+        { 
+            if (currentCombatState == CombatState.None)
+            {
+                currentCombatState = CombatState.Shoot;
+            }
+        }
+    }
+
+    // 將設定狀態、動畫、計時器歸零的動作封裝起來，保持代碼乾淨
+    private void StartSlashState(CombatState slashState)
+    {
+        currentCombatState = slashState;
+        attackTimer = 0f;
+        isComboAttack = false;
+
+        // 根據目前的移動狀態，決定要播什麼動畫
+        if (currentMoveState == MovementState.Jump || currentMoveState == MovementState.Fall)
+        {
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.JumpSlash);
+            attackDuration = 0.25f; // 空中斬可能需要停頓久一點
+                                    // comboCount = -1; // 如果空中斬不允許連擊，可以這樣設定
+        }
+        else if (currentMoveState == MovementState.Run)
+        {
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.RunSlash);
+            attackDuration = 0.2f;
+        }
+        else if (currentMoveState == MovementState.Rush)
+        {
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.RushSlash);
+            attackDuration = 0.2f;
+        }
+        else
+        {
+            // 站立平砍
+            if (slashState == CombatState.Slash1) PlrAnim.SetInteger("ActionCode", (int)AnimCode.Slash1);
+            else if (slashState == CombatState.Slash2) PlrAnim.SetInteger("ActionCode", (int)AnimCode.Slash2);
+            else if (slashState == CombatState.Slash3) PlrAnim.SetInteger("ActionCode", (int)AnimCode.Slash3);
+
+            attackDuration = 0.2f; // 平砍的動畫時間
+            comboCount++; // 打出後，段數加 1，準備給下一刀使用
+        }
+    }
+
+    private void ExecuteCombatState()
+    {
+        // ----------------------------------------
+        // 1. 處理「連擊記憶」的消退 (只有在沒攻擊時才倒數)
+        // ----------------------------------------
+        if (currentCombatState == CombatState.None && comboCount > 0)
+        {
+            comboTimer += Time.deltaTime;
+
+            float comboWindow = 0.4f; // 允許延遲派生的寬限時間
+            if (comboTimer >= comboWindow)
+            {
+                comboCount = 0; // 寬限期過，徹底忘記連擊段數
+                                // 由於目前是 None 狀態，角色自然會處於 Idle，不需要特別切換動畫
+            }
+        }
+
+        // ----------------------------------------
+        // 2. 處理「攻擊硬直與收招」
+        // ----------------------------------------
+        if (currentCombatState == CombatState.Slash1 ||
+            currentCombatState == CombatState.Slash2 ||
+            currentCombatState == CombatState.Slash3)
+        {
+            attackTimer += Time.deltaTime;
+
+            // 動畫播完了！
+            if (attackTimer >= attackDuration)
+            {
+                // 解除攻擊狀態
+                currentCombatState = CombatState.None;
+                attackTimer = 0f;
+                comboTimer = 0f; // 重置記憶計時器，開始倒數延遲派生！
+
+                // 檢查是否要無縫接軌下一刀
+                if (isComboAttack && comboCount > 0 && comboCount < 3)
+                {
+                    // 如果是 Slash1 結束，就接 Slash2
+                    if (comboCount == 1)
+                    {
+                        StartSlashState(CombatState.Slash2);
+                    }
+                    else if (comboCount == 2)
+                    {
+                        StartSlashState(CombatState.Slash3);
+                    }
+                }
+                else
+                {
+                    // 沒有預先輸入，準備收招 (恢復移動動畫)
+                    // 這裡我們把動畫的控制權「交還」給移動系統
+                    if (currentMoveState == MovementState.Idle)
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
+                    else if (currentMoveState == MovementState.Run)
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Run);
+                    else if (IsOnAir())
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump); // 或是 Fall
+                }
+            }
+        }
+        // ----------------------------------------
+        // 3. 處理射擊
+        // ----------------------------------------
+        if(currentCombatState == CombatState.Shoot)
+        {
+            ShootTime += Time.deltaTime;
+            if (ShootTime > 0.15f && (currentMoveState != MovementState.Jump||currentMoveState != MovementState.Rush ))
+            {
+                ShootTime = 0;
+                ShootBullet();
+            }
+            if (currentMoveState == MovementState.Idle)
+            {
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.StandShoot);
+            }
+            else if (currentMoveState == MovementState.Run)
+            {
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.RunShoot);
+            }
+            else if (currentMoveState == MovementState.Jump)
+            {
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.JumpShoot);
+            }
+            else if (currentMoveState == MovementState.Rush)
+            {
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.RushShoot);
+            }
+        }
+    }
+
 
     // 傳入 inputDir，並預留一個 speedMultiplier (速度倍率)，預設為 1
     private void HorizontalMovement(Vector2 inputDir, float speedMultiplier = 1f, float moveSpeed = 1f)
@@ -482,42 +506,9 @@ public class PlayerControl : MonoBehaviour
         transform.Translate(moveSpeed * speedMultiplier * Time.deltaTime * moveDir, Space.World);
     }
 
-    void ExecuteNextSlash()
-    {
-
-        isAttacking = true;
-        attackTimer = 0f;
-        isComboAttack = false;
-
-        // 如果目前 comboCount 是 1，播 ActionCode 7 (第二刀)
-        // 如果目前 comboCount 是 2，播 ActionCode 8 (第三刀)
-        PlrAnim.SetInteger("ActionCode", 6 + comboCount);
-
-        comboCount++; // 打完後段數繼續往上加
-
-    }
-
     void ShootBullet()
     {
         PrefabMgr.setEff(2, ShootPos, currentFacing == Facing.Right);
-    }
-
-    void OnShootingPress(int ShotWeapon = 0)
-    {
-        ShootTime += Time.deltaTime;
-        if (ShootTime > 0.15f)
-        {
-            ShootTime = 0;
-            ShootBullet();
-        }
-        if (direction == 5 && currentMoveState != MovementState.Rush && !IsOnAir())
-        {
-            PlrAnim.SetInteger("ActionCode", 9);
-        }
-        else if (!IsOnAir() && (direction == 4 || direction == 6))
-        {
-            PlrAnim.SetInteger("ActionCode", 11);
-        }
     }
 
     void OnTriggerEnter2D(Collider2D col)
@@ -525,26 +516,22 @@ public class PlayerControl : MonoBehaviour
         Debug.Log("OnTriggerEnter2D");
         if (col.gameObject.CompareTag("Terrain_Ground") == true)
         {
-            if (isAttacking)
+            //取消攻擊
+            if (currentCombatState != CombatState.None)
             {
-                isAttacking = false;
-            }
-            if (isShooting)
-            {
-                isShooting = false;
-                ShootTime = 0;
+                CancelAttack();
             }
             if (currentMoveState == MovementState.Rush)
             {
-                PlrAnim.SetInteger("ActionCode", 3);
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Rush );
             }
-            else if (currentMoveState == MovementState.Rush)
+            else if (currentMoveState == MovementState.Run)
             {
-                PlrAnim.SetInteger("ActionCode", 1);
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Run );
             }
             else
             {
-                PlrAnim.SetInteger("ActionCode", 0);
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
             }
         }
     }
@@ -555,13 +542,18 @@ public class PlayerControl : MonoBehaviour
         if (col.gameObject.CompareTag("Terrain_Ground") == true && currentMoveState != MovementState.Jump)
         {
             currentMoveState = MovementState.Fall;
-            PlrAnim.SetInteger("ActionCode", 2);
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump );
         }
     }
 
     bool IsOnAir()
     {
         return currentMoveState == MovementState.Jump || currentMoveState == MovementState.Fall;
+    }
+
+    bool IsShashing()
+    {
+        return currentCombatState == CombatState.Slash1 ||currentCombatState == CombatState.Slash2 || currentCombatState == CombatState.Slash3;
     }
 
 
@@ -578,6 +570,19 @@ public class PlayerControl : MonoBehaviour
             transform.position = new Vector3(transform.position.x, correctY, transform.position.z);
             Debug.Log("Reset Height");
         }
+    }
+
+    void CancelAttack()
+    {
+        Debug.LogWarning("CancelAttack");
+        currentCombatState = CombatState.None;
+
+        // 徹底清空所有近戰與遠程的計時器與標記
+        attackTimer = 0f;
+        comboTimer = 0f;
+        comboCount = 0;
+        isComboAttack = false;
+        ShootTime = 0;
     }
 
 }
