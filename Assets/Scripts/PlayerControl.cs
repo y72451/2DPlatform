@@ -6,7 +6,6 @@ using static PlayerControl;
 public class PlayerControl : MonoBehaviour
 {
     public PlayerStatus plrStatus;
-    public ActionStates ActionState;
     private int direction;
     InputManager InputMgr;
     PrefabManager PrefabMgr;
@@ -21,18 +20,19 @@ public class PlayerControl : MonoBehaviour
     }
 
     public Facing currentFacing = Facing.Left;
-    public bool isRushing = false;
     private float rushTime = 0.5f;
 
     private GroundInfo frontGroundInfo;
     private GroundInfo rearGroundInfo;
+    private GroundInfo centerGroundInfo;
+
+    public MovementState currentMoveState = MovementState.Idle;
+    public CombatState currentCombatState = CombatState.None;
 
     //跳躍控制
     public JumpParameter jumpParameter;
     private float jumpTimer = 0f;
     private float currentYSpeed = 0f;
-    public bool isJumping = false;
-    public bool isFalling = true;
 
     //private Rigidbody2D rb;
     public float slopeCheckDistance = 15.0f;
@@ -43,6 +43,7 @@ public class PlayerControl : MonoBehaviour
     public Transform RearLegPos;
     public Transform CenterGroundPos;
     public Transform DustPos;
+
 
     //暫時變數
     public bool isAttacking = false;
@@ -100,73 +101,15 @@ public class PlayerControl : MonoBehaviour
         #region move
 
         //
-        float moveSpeed = plrStatus.moveSpeed;
+        
         frontGroundInfo = GroundDetector.DetectGround(FrontLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
         rearGroundInfo = GroundDetector.DetectGround(RearLegPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
-        GroundInfo centerGroundInfo = GroundDetector.DetectGround(CenterGroundPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
+        centerGroundInfo = GroundDetector.DetectGround(CenterGroundPos, slopeCheckDistance, LayerMask.GetMask("Terrain_Ground"));
 
-        //處理面向
-        Vector2 inputDir = InputMgr.GetMovementVector();
-        direction = InputMgr.GetDirection();
-        if (inputDir.x != 0)
-        {
-            Facing newFacing = inputDir.x > 0 ? Facing.Right : Facing.Left;
-            if (newFacing != currentFacing)
-            {
-                currentFacing = newFacing;
-                Flip(currentFacing);
-            }
-        }
+        CheckMovementTransitions();
+        ExecuteMovementState();
 
-        if (!IsOnAir())
-        {
-
-        }
-        if (!isRushing)
-        {
-            if (inputDir != Vector2.zero)
-            {
-                // 1. 建立純粹的世界座標水平輸入向量
-                Vector2 horizontalMove = new Vector2(inputDir.x, 0f);
-                Vector2 moveDir = horizontalMove.normalized; //預設平行移動(平地或空中)
-
-                if (centerGroundInfo.isGrounded && centerGroundInfo.slopeAngle > 0 && centerGroundInfo.slopeAngle <= 45f)
-                {
-                    // 2. 利用 Vector3.ProjectOnPlane 將水平輸入「投影」到斜坡法線上
-                    // 這會自動幫你算出貼合斜坡的完美斜向向量，無論向左或向右都絕對正確
-                    moveDir = Vector3.ProjectOnPlane(horizontalMove, centerGroundInfo.slopeNormal).normalized;
-                }
-
-                // Debug.Log("Apply PlaneMove (World): " + moveDir);
-                // 3. 【關鍵修正】明確指定 Space.World！
-                // 這樣位移就完全不會受到 Flip() 轉 Y 軸的干擾
-                transform.Translate(moveSpeed * Time.deltaTime * moveDir, Space.World);
-
-                if (!IsOnAir() && !isAttacking)
-                {
-                    PlrAnim.SetInteger("ActionCode", 1);
-                }
-            }
-            else if (inputDir == Vector2.zero)
-            {
-                if (!IsOnAir() && !isAttacking)
-                {
-                    PlrAnim.SetInteger("ActionCode", 0);
-                }
-            }
-        }
-
-        if (isRushing)
-        {
-            this.gameObject.transform.Translate(new Vector2(-1, 0) * Time.deltaTime * moveSpeed * 3);
-            rushTime = rushTime - Time.deltaTime;
-            if (rushTime <= 0)
-            {
-                rushTime = 0.5f;
-                isRushing = false;
-            }
-        }
-
+        /*
         if (isJumping)
         {
             jumpTimer += Time.deltaTime;
@@ -191,6 +134,7 @@ public class PlayerControl : MonoBehaviour
                 ResetHeight();
             }
         }
+        */
         #endregion move
 
         #region attack
@@ -232,19 +176,19 @@ public class PlayerControl : MonoBehaviour
                 }
                 else
                 {
-                    if (isRushing)
+                    if (currentMoveState == MovementState.Rush)
                     {
-                        PlrAnim.SetInteger("ActionCode", 3);
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Rush);
                     }
                     else if (IsOnAir())
                     {
-                        PlrAnim.SetInteger("ActionCode", 2);
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump);
                         Debug.Log("Back to jump position");
                         //Debug.Break();
                     }
                     else
                     {
-                        PlrAnim.SetInteger("ActionCode", 0);
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
                     }
 
                     Debug.Log("End of AttackAnim");
@@ -257,7 +201,7 @@ public class PlayerControl : MonoBehaviour
         //持續射擊
         if (isShooting)
         {
-            if (isShooting && isRushing == false && (isJumping || isFalling) == false)
+            if (isShooting && currentMoveState == MovementState.Rush == false && (IsOnAir()) == false)
             {
                 OnShootingPress();
             }
@@ -270,29 +214,20 @@ public class PlayerControl : MonoBehaviour
     void HandleJump()
     {
         
-        isJumping = true;
+        currentMoveState = MovementState.Jump;
         jumpTimer = 0f;
-        PlrAnim.SetInteger("ActionCode", 2);
+        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump);
     }
 
     //衝刺
     void HandleRush()
     {
-        if (!isRushing)
+        if (currentMoveState != MovementState.Rush)
         {
-            isRushing = true;
-            PlrAnim.SetInteger("ActionCode", 3);
+            currentMoveState = MovementState.Rush;
+            rushTime = 0.5f;
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.Rush);
             PrefabMgr.setEff(1, DustPos, currentFacing == Facing.Right);
-            /*
-            if (plrDebugOption != null && plrDebugOption.GetSpecialRush() == true)
-            {
-                PlrAnim.SetInteger("ActionCode", 16);
-            }
-            else
-            {
-                PlrAnim.SetInteger("ActionCode", 3);
-            }      
-            */
 
             //取消攻擊
             if (isShooting)
@@ -335,7 +270,7 @@ public class PlayerControl : MonoBehaviour
                              // Debug.Log("Air Slash");
             //Debug.Break();
         }
-        else if (isRushing)
+        else if (currentMoveState == MovementState.Rush)
         {
             PlrAnim.SetInteger("ActionCode", 12); // 衝刺砍
             comboCount = -1;
@@ -368,7 +303,7 @@ public class PlayerControl : MonoBehaviour
             isShooting = true;
         }
         //站立狀態
-        if (direction == 5 && !isRushing && !IsOnAir())
+        if (direction == 5 && currentMoveState != MovementState.Rush && !IsOnAir())
         {
             PlrAnim.SetInteger("ActionCode", 9);
         }
@@ -376,7 +311,7 @@ public class PlayerControl : MonoBehaviour
         {
             PlrAnim.SetInteger("ActionCode", 11);
         }
-        else if (isRushing)
+        else if (currentMoveState == MovementState.Rush)
         {
             PlrAnim.SetInteger("ActionCode", 13);
         }
@@ -403,6 +338,174 @@ public class PlayerControl : MonoBehaviour
     void Flip(Facing facing)
     {
         transform.rotation = Quaternion.Euler(0f, facing == Facing.Right ? 180f : 0f, 0f);
+    }
+
+    private void CheckMovementTransitions()
+    {
+        // 如果正在衝刺，通常不允許其他移動狀態中斷 (直到衝刺計時結束)
+        if (currentMoveState == MovementState.Rush) return;
+
+        // 1. 取得最新輸入
+        Vector2 inputDir = InputMgr.GetMovementVector();
+
+        // 2. 處理衝刺觸發
+        if (InputMgr.IsRushPressed() && !IsOnAir())
+        {
+            currentMoveState = MovementState.Rush;
+            rushTime = 0.5f; // 重置計時器
+            PlrAnim.SetInteger("ActionCode", (int)AnimCode.Rush);
+            return;
+        }
+
+        // ==========================================
+        // 3. 物理狀態與邏輯狀態的同步 (踩空與落地)
+        // ==========================================
+
+        // A. 踩空判斷：如果物理上沒踩到地板，且邏輯上「不是正在向上跳」
+        if (!centerGroundInfo.isGrounded && currentMoveState != MovementState.Jump)
+        {
+            // 強制進入下墜狀態 (這完美解決了開場在半空，或是走路摔下懸崖的問題)
+            if (currentMoveState != MovementState.Fall)
+            {
+                currentMoveState = MovementState.Fall;
+
+                // 如果沒在攻擊，切換成落下/跳躍的動畫
+                if (currentCombatState == CombatState.None)
+                {
+                    PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump); // 或是如果你有專屬的 Fall 動畫也可以填入
+                }
+            }
+        }
+        // B. 落地判斷：如果物理上踩到地板，且邏輯上「正在下墜」
+        else if (centerGroundInfo.isGrounded && currentMoveState == MovementState.Fall)
+        {
+            currentMoveState = MovementState.Idle;
+            ResetHeight(); // 物理對齊地板
+
+            // 如果沒在攻擊，切回待機動畫
+            if (currentCombatState == CombatState.None)
+            {
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
+            }
+        }
+
+        // 4. 處理滯空與落地 (結合你之前修好的中心點射線)
+        if (IsOnAir())
+        {
+            if (centerGroundInfo.isGrounded && currentMoveState == MovementState.Fall)
+            {
+                // 落地了！
+                currentMoveState = MovementState.Idle;
+                ResetHeight(); // 物理對齊
+
+                // 只有沒在攻擊時才切換落地動畫
+                if (currentCombatState == CombatState.None)
+                {
+                    PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
+                }
+            }
+            return; // 在空中就不往下判斷跑步了
+        }
+
+        // 5. 處理平地移動與待機
+        if (inputDir.x != 0)
+        {
+            currentMoveState = MovementState.Run;
+            // 只有沒在攻擊時才切換跑步動畫
+            if (currentCombatState == CombatState.None)
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Run);
+        }
+        else
+        {
+            currentMoveState = MovementState.Idle;
+            if (currentCombatState == CombatState.None)
+                PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
+        }
+    }
+
+    private void ExecuteMovementState()
+    {
+
+        float moveSpeed = plrStatus.moveSpeed;
+        // 處理面向 (Flip)
+        Vector2 inputDir = InputMgr.GetMovementVector();
+        if (inputDir.x != 0 && currentMoveState != MovementState.Rush)
+        {
+            Facing newFacing = inputDir.x > 0 ? Facing.Right : Facing.Left;
+            if (newFacing != currentFacing)
+            {
+                currentFacing = newFacing;
+                Flip(currentFacing);
+            }
+        }
+
+        switch (currentMoveState)
+        {
+            case MovementState.Idle:
+                // 待機不產生額外位移
+                break;
+
+            case MovementState.Run:
+                // 塞入你之前寫好的完美斜坡投影邏輯
+                Vector2 horizontalMove = new Vector2(inputDir.x, 0f);
+                Vector2 moveDir = horizontalMove.normalized;
+
+                HorizontalMovement(inputDir, 1f,moveSpeed);
+                break;
+
+            case MovementState.Jump:
+
+                HorizontalMovement(inputDir, 0.8f,moveSpeed);
+                // 塞入跳躍上升邏輯
+                jumpTimer += Time.deltaTime;
+                float jumpProgress = jumpTimer / jumpParameter.jumpDuration;
+                currentYSpeed = Mathf.Lerp(jumpParameter.jumpHeight / jumpParameter.jumpDuration, 0, jumpProgress);
+                transform.Translate(Vector2.up * currentYSpeed * Time.deltaTime);
+
+                if (jumpProgress >= 1f)
+                {
+                    currentMoveState = MovementState.Fall; // 狀態機自動切換到下墜
+                }
+                break;
+
+            case MovementState.Fall:
+
+                HorizontalMovement(inputDir, 0.8f,moveSpeed);
+                // 塞入重力下墜邏輯
+                transform.Translate(Vector2.down * jumpParameter.fallSpeed * Time.deltaTime);
+                break;
+
+            case MovementState.Rush:
+                // 塞入衝刺邏輯
+                transform.Translate(new Vector2((int)currentFacing * -1, 0) * Time.deltaTime * moveSpeed * 3, Space.World);
+                rushTime -= Time.deltaTime;
+                if (rushTime <= 0)
+                {
+                    currentMoveState = MovementState.Idle; // 衝刺結束回歸待機
+                    if (currentCombatState == CombatState.None)
+                        PlrAnim.SetInteger("ActionCode", (int)AnimCode.Idle);
+                }
+                break;
+        }
+    }
+
+    // 傳入 inputDir，並預留一個 speedMultiplier (速度倍率)，預設為 1
+    private void HorizontalMovement(Vector2 inputDir, float speedMultiplier = 1f, float moveSpeed = 1f)
+    {
+        // 如果沒有輸入，就不做水平位移
+        if (inputDir.x == 0) return;
+
+        Vector2 horizontalMove = new Vector2(inputDir.x, 0f);
+        Vector2 moveDir = horizontalMove.normalized;
+
+        // 斜坡投影：只有在踩著地板的時候才會觸發 (所以空中呼叫時，這段會自動被跳過，非常安全)
+        if (centerGroundInfo.isGrounded && centerGroundInfo.slopeAngle > 0 && centerGroundInfo.slopeAngle <= 45f)
+        {
+            moveDir = Vector3.ProjectOnPlane(horizontalMove, centerGroundInfo.slopeNormal).normalized;
+        }
+
+        // 實際移動 (套用速度倍率)
+        transform.Translate(moveSpeed * speedMultiplier * Time.deltaTime * moveDir, Space.World);
     }
 
     void ExecuteNextSlash()
@@ -433,7 +536,7 @@ public class PlayerControl : MonoBehaviour
             ShootTime = 0;
             ShootBullet();
         }
-        if (direction == 5 && !isRushing && !IsOnAir())
+        if (direction == 5 && currentMoveState != MovementState.Rush && !IsOnAir())
         {
             PlrAnim.SetInteger("ActionCode", 9);
         }
@@ -457,11 +560,11 @@ public class PlayerControl : MonoBehaviour
                 isShooting = false;
                 ShootTime = 0;
             }
-            if (isRushing)
+            if (currentMoveState == MovementState.Rush)
             {
                 PlrAnim.SetInteger("ActionCode", 3);
             }
-            else if (isRushing)
+            else if (currentMoveState == MovementState.Rush)
             {
                 PlrAnim.SetInteger("ActionCode", 1);
             }
@@ -475,16 +578,16 @@ public class PlayerControl : MonoBehaviour
     void OnTriggerExit2D(Collider2D col)
     {
         Debug.Log("OnTriggerExit2D");
-        if (col.gameObject.CompareTag("Terrain_Ground") == true && !isJumping)
+        if (col.gameObject.CompareTag("Terrain_Ground") == true && currentMoveState != MovementState.Jump)
         {
-            isFalling = true;
+            currentMoveState = MovementState.Fall;
             PlrAnim.SetInteger("ActionCode", 2);
         }
     }
 
     bool IsOnAir()
     {
-        return (isJumping || isFalling);
+        return currentMoveState == MovementState.Jump || currentMoveState == MovementState.Fall;
     }
 
 
