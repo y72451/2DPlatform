@@ -34,7 +34,7 @@ public enum AnimCode
     RunShoot = 11,
     RushSlash = 12,
     RushShoot = 13,
-    JumpShash = 14,
+    JumpSlash = 14,
     JumpShoot = 15,
     SpacialRush = 16,
 }
