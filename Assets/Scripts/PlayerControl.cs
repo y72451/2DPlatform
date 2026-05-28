@@ -109,32 +109,6 @@ public class PlayerControl : MonoBehaviour
         CheckMovementTransitions();
         ExecuteMovementState();
 
-        /*
-        if (isJumping)
-        {
-            jumpTimer += Time.deltaTime;
-            // 逐漸減速（上升）
-            float jumpProgress = jumpTimer / jumpParameter.jumpDuration;
-            currentYSpeed = Mathf.Lerp(jumpParameter.jumpHeight / jumpParameter.jumpDuration, 0, jumpProgress);
-            transform.Translate(Vector2.up * currentYSpeed * Time.deltaTime);
-            if (jumpProgress >= 1f)
-            {
-                isJumping = false;
-                isFalling = true;
-            }
-        }
-        else if (isFalling)
-        {
-            transform.Translate(Vector2.down * jumpParameter.fallSpeed * Time.deltaTime);
-            if (frontGroundInfo.isGrounded)
-            {
-                isFalling = false;
-                currentYSpeed = 0f;
-                jumpTimer = 0f;
-                ResetHeight();
-            }
-        }
-        */
         #endregion move
 
         #region attack
