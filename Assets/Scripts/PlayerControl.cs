@@ -114,7 +114,10 @@ public class PlayerControl : MonoBehaviour
     //跳躍
     void HandleJump()
     {
-        
+        // 【守衛條款】如果在衝刺，或正在攻擊，直接無效化跳躍輸入！
+        if (currentMoveState == MovementState.Rush) return;
+        if (currentCombatState != CombatState.None) return;
+
         currentMoveState = MovementState.Jump;
         jumpTimer = 0f;
         PlrAnim.SetInteger("ActionCode", (int)AnimCode.Jump);
@@ -205,7 +208,7 @@ public class PlayerControl : MonoBehaviour
             ResetHeight(); // 物理對齊地板
 
             // 如果沒在攻擊，切回待機動畫
-            if (currentCombatState == CombatState.None)
+            if (currentCombatState != CombatState.None)
             {
                 CancelAttack();                
             }
